@@ -21,10 +21,10 @@ const HELP_DESCRIPTION = `Chat Bot Available Commands:
 
 🧹 /clear
 To clear chat conversation form chat bot.
+🎨 /imagine
+Generating images (is comming soon).
 🛟 /help
 To show help commands.
-🎨 /imagine
-is comming soon.
 
 Powred by: Mrmed 😁
 `
@@ -80,7 +80,7 @@ export class ChatBot
     _chatContentToPass()
     {
         let latestChatContent = this.chat.slice(-MAX_PREV_KNOWLEDGE)
-        console.log("Chat Length Passed:", latestChatContent.length)
+        //console.log("Chat Length Passed:", latestChatContent.length)
         return [this.chat[0], ...latestChatContent]
     }
 
