@@ -7,12 +7,30 @@ import ffmpeg from 'fluent-ffmpeg';
 
 const DEFAULT_AI_MODEL = "gpt-3.5-turbo"
 
-const defaultSystemInstructions = "You're an enthusiastic chat bot called XChat, answering qestions."
+const DEFAULT_CHAT_SYSTEM_INSTRUCTIONS = "You're an enthusiastic chat bot called XChat, answering qestions."
 
 const VALID_COMMANDS = [
     "/clear",
     "/help"
 ]
+
+const MAX_PREV_KNOWLEDGE = 10 // number of conversations in chat
+
+const HELP_DESCRIPTION = `Chat Bot Available Commands:
+💬 You can ask anything via writing or audio recording.
+
+🧹 /clear
+To clear chat conversation form chat bot.
+🛟 /help
+To show help commands.
+🎨 /imagine
+is comming soon.
+
+Powred by: Mrmed 😁
+`
+
+
+
 
 
 const configuration = new Configuration({
@@ -24,7 +42,7 @@ const openai = new OpenAIApi(configuration);
 
 export class ChatBot
 {
-    constructor(systemInstructions = defaultSystemInstructions)
+    constructor(systemInstructions = DEFAULT_CHAT_SYSTEM_INSTRUCTIONS)
     {
         this._systemInstructions = systemInstructions
         this.chat = this.initializeChat()
@@ -44,9 +62,6 @@ export class ChatBot
 
         const reply = await this.generateReply()
 
-        console.log("Assistant: ")
-        console.log(reply)
-
         // register reply
         this.chat[this.chat.length] = { role: "assistant", content: reply }
         return reply
@@ -56,10 +71,17 @@ export class ChatBot
     {
         const completion = await openai.createChatCompletion({
             model: DEFAULT_AI_MODEL,
-            messages: this.chat,
+            messages: this._chatContentToPass(),
         });
 
         return completion.data.choices[0].message.content
+    }
+
+    _chatContentToPass()
+    {
+        let latestChatContent = this.chat.slice(-MAX_PREV_KNOWLEDGE)
+        console.log("Chat Length Passed:", latestChatContent.length)
+        return [this.chat[0], ...latestChatContent]
     }
 
     clear()
@@ -93,17 +115,20 @@ export class ChatManager
                 let readableAudio = Readable.from(buffer)
 
                 const text = await this._SpeechToText(readableAudio, message)
-                console.log("Text:", text)
                 message.body = text || ""
             }
         }
 
-        const chatbot = this._getChatBot(message)
+        // for console
+        console.log(`USER (${message.from}): ${message.body}`)
 
+        const chatbot = this._getChatBot(message)
         const reply = await chatbot.getReply(message.body)
 
-        // TODO: return the reply
-        // return client.sendMessage(message.from, reply)
+        // for console
+        console.log("Assistant: ")
+        console.log(reply)
+
         return reply
     }
 
@@ -190,6 +215,8 @@ export class ChatManager
         if (this._chats[message.from] === undefined)
         {
             this._chats[message.from] = new ChatBot()
+            // show help commands
+            this._client.sendMessage(message.from, HELP_DESCRIPTION)
         }
 
         return this._chats[message.from]
@@ -198,14 +225,11 @@ export class ChatManager
     _clearChatBot(message, chatbot)
     {
         chatbot.clear()
-        this._client.sendMessage(message.from, "Conversation successfully cleared!")
+        this._client.sendMessage(message.from, "👍 Conversation cleared!")
     }
 
     _showHelpCommands(message)
     {
-        this._client.sendMessage(message.from, `Chat Bot Available Commands:
-/clear\t to clear chat conversation form chat bot.
-/help\t to show help.
-        `)
+        this._client.sendMessage(message.from, HELP_DESCRIPTION)
     }
 }

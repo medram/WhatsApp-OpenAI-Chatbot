@@ -31,10 +31,27 @@ client.on('ready', () => {
 client.on("message", async (message) => {
     console.log(`${message.from}: ${message.body}`)
 
+    const chat = await message.getChat()
+
+    // send typing state
+    chat.sendStateTyping();
+
     let reply = await chatManager.reply(message)
+
+    // Typing state
+    chat.clearState()
 
     if (reply)
         client.sendMessage(message.from, reply)
+})
+
+client.on('call', async (call) => {
+    await call.reject()
+    client.sendMessage(call.from, "🥺 Please don't call me.")
+})
+
+client.on('disconnected', reason => {
+    console.log('Client was logged out', reason);
 })
 
 client.initialize()
