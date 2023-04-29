@@ -33,7 +33,8 @@ client.on("message", async (message) => {
 
     let reply = await chatManager.reply(message)
 
-    client.sendMessage(message.from, reply)
+    if (reply)
+        client.sendMessage(message.from, reply)
 })
 
 client.initialize()

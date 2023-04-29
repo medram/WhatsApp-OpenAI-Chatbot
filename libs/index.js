@@ -1,4 +1,9 @@
+import fs from "fs"
+import { Readable } from "stream"
+
 import { Configuration, OpenAIApi } from "openai"
+import ffmpeg from 'fluent-ffmpeg';
+
 
 const DEFAULT_AI_MODEL = "gpt-3.5-turbo"
 
@@ -75,7 +80,23 @@ export class ChatManager
     async reply(message)
     {
         // check & execute command.
-        this.execute(message)
+        if (this.isCommand(message))
+            return this.execute(message)
+
+        // is audio
+        if (this.isAudio(message))
+        {
+            const media = await message.downloadMedia()
+            if (media)
+            {
+                const buffer = Buffer.from(media.data, "base64")
+                let readableAudio = Readable.from(buffer)
+
+                const text = await this._SpeechToText(readableAudio, message)
+                console.log("Text:", text)
+                message.body = text || ""
+            }
+        }
 
         const chatbot = this._getChatBot(message)
 
@@ -88,7 +109,7 @@ export class ChatManager
 
     execute(message)
     {
-        if (message.body[0] === "/" && VALID_COMMANDS.includes(message.body.trim()) )
+        if (this.isCommand(message))
         {
             // execute command
             const chatbot = this._getChatBot(message)
@@ -107,6 +128,60 @@ export class ChatManager
                     this._showHelpCommands(message)
             }
         }
+    }
+
+    isAudio(message)
+    {
+        return message.hasMedia && message._data.mimetype.toLowerCase().includes("audio")
+    }
+
+    isCommand(message)
+    {
+        return message.body[0] === "/" && VALID_COMMANDS.includes(message.body.trim().toLowerCase())
+    }
+
+    _SpeechToText(readableAudio, message)
+    {
+        let audioPath = this._generateAudioPath(message)
+
+        const command = ffmpeg(readableAudio)
+            .format("mp3")
+            .audioCodec('libmp3lame')
+            .output(fs.createWriteStream(audioPath))
+
+        return new Promise((resolve, reject) => {
+            command.on('end', async () => {
+                try {
+                    let transcription = await openai.createTranscription(fs.createReadStream(audioPath), 'whisper-1')
+                    // assign audio transcription to chat content.
+                    resolve(transcription.data.text)
+
+                } catch (error) {
+                    if (error.response && error.response.status === 400) {
+                        reject('OpenAI Bad request:', error.response.data)
+                    } else {
+                        reject('OpenAI Error:', error.message)
+                    }
+                }
+            })
+            .on('error', function (err) {
+                reject('ffmpeg error occurred: ' + err.message)
+            })
+            .run()
+        })
+    }
+
+    _generateAudioPath(message)
+    {
+        const folder = `tmp/${message.from}`
+        if (!fs.existsSync(folder))
+            fs.mkdirSync(folder)
+        return `${folder}/${this._generateAudioName()}`
+    }
+
+    _generateAudioName()
+    {
+        return new Date().toGMTString().replaceAll(" ", "_").replaceAll(":", ".").replaceAll(",", "") + '.mp3'
     }
 
     _getChatBot(message)
