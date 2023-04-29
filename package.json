@@ -1,0 +1,17 @@
+{
+  "name": "whatappbot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "openai": "^3.2.1",
+    "qrcode": "^1.5.3",
+    "whatsapp-web.js": "^1.19.5"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
